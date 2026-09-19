@@ -15,13 +15,49 @@ from embeddings import get_embedding_function
 BASE_DIR = Path(__file__).resolve().parent
 COLLECTION_NAME = "fmr_documents"
 
+NOT_FOUND_MESSAGE = "I could not find that in the provided FMR reports."
+OFF_TOPIC_MESSAGE = (
+    "I can only answer questions about the NBP Fund Manager Reports. "
+    "Could you please ask about a fund's risk profile, performance, asset allocation, or comparison?"
+)
+ABUSE_REDIRECT_MESSAGE = (
+    "Let's keep this conversation respectful. Please ask a question about a fund's "
+    "risk profile, performance, asset allocation, or comparison, and I will be glad to help."
+)
+
+GREETING_PATTERN = re.compile(
+    r"^\s*(hi+|hello+|hey+|hy+|salam|assalam.?o.?alaikum|assalamualaikum|"
+    r"good\s+(morning|afternoon|evening))[\s!.,]*$",
+    re.IGNORECASE,
+)
+ABUSE_KEYWORDS = (
+    "stupid",
+    "idiot",
+    "dumb",
+    "useless",
+    "shut up",
+    "nonsense",
+    "garbage",
+)
+
 SYSTEM_PROMPT = """You answer questions about NBP Fund Management Limited Fund Manager Reports.
 Use only the supplied context. Never guess, calculate missing values, or use outside knowledge.
 When the context is insufficient, say: 'I could not find that in the provided FMR reports.'
 Distinguish Conventional and Islamic funds carefully. Do not write page numbers in the answer
 prose because a report may have a printed page number different from its PDF page number. The
 application separately displays the exact source_file and PDF source_page metadata. Never invent
-financial facts. This is informational content, not financial advice."""
+financial facts. This is informational content, not financial advice.
+
+If the user's message is not a question about the NBP Fund Manager Reports (for example personal
+questions, general knowledge, or casual conversation unrelated to funds), do not answer using
+outside knowledge. Reply with exactly: "I can only answer questions about the NBP Fund Manager
+Reports. Could you please ask about a fund's risk profile, performance, asset allocation, or
+comparison?"
+
+If the user's message is offensive, rude, or abusive, never respond in kind and never insult the
+user. Reply calmly with exactly: "Let's keep this conversation respectful. Please ask a question
+about a fund's risk profile, performance, asset allocation, or comparison, and I will be glad to
+help."""
 
 
 def matched_section(question: str) -> str | None:
@@ -79,9 +115,21 @@ def retrieve(question: str, count: int = 5) -> list[dict]:
 
 def answer(question: str, count: int = 5) -> dict:
     """Retrieve evidence and generate a grounded answer with the configured AI model."""
+    if GREETING_PATTERN.match(question):
+        return {
+            "answer": (
+                "Hello! I can help you explore the NBP Fund Manager Reports. "
+                "Ask me about a fund's risk profile, performance, asset allocation, or comparison."
+            ),
+            "sources": [],
+        }
+    lowered_question = question.lower()
+    if any(keyword in lowered_question for keyword in ABUSE_KEYWORDS):
+        return {"answer": ABUSE_REDIRECT_MESSAGE, "sources": []}
+
     sources = retrieve(question, count=count)
     if not sources:
-        return {"answer": "I could not find that in the provided FMR reports.", "sources": []}
+        return {"answer": NOT_FOUND_MESSAGE, "sources": []}
 
     context = "\n\n".join(
         f"[Source {index}] {item['metadata']}\n{item['text']}"
@@ -154,5 +202,8 @@ def answer(question: str, count: int = 5) -> dict:
 
     if not response:
         raise RuntimeError("The configured AI model returned an empty response.")
+
+    if response in (NOT_FOUND_MESSAGE, OFF_TOPIC_MESSAGE, ABUSE_REDIRECT_MESSAGE):
+        return {"answer": response, "sources": []}
 
     return {"answer": response, "sources": sources}

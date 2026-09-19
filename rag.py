@@ -10,6 +10,8 @@ import chromadb
 import requests
 from dotenv import load_dotenv
 
+from embeddings import get_embedding_function
+
 BASE_DIR = Path(__file__).resolve().parent
 COLLECTION_NAME = "fmr_documents"
 
@@ -41,7 +43,7 @@ def collection():
     """Open the persistent ChromaDB collection used by the chatbot."""
     load_dotenv(BASE_DIR / ".env")
     client = chromadb.PersistentClient(path=str(BASE_DIR / "chroma_db"))
-    return client.get_or_create_collection(COLLECTION_NAME)
+    return client.get_or_create_collection(COLLECTION_NAME, embedding_function=get_embedding_function())
 
 
 def retrieve(question: str, count: int = 5) -> list[dict]:

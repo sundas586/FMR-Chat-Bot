@@ -23,6 +23,8 @@ import chromadb
 import fitz #  The PyMuPDF library, imported as fitz
 from dotenv import load_dotenv
 
+from embeddings import get_embedding_function
+
 BASE_DIR = Path(__file__).resolve().parent
 PDF_DIR = BASE_DIR
 CHROMA_DIR = BASE_DIR / "chroma_db"
@@ -81,7 +83,7 @@ def ingest(reset: bool = False) -> int:
             client.delete_collection(COLLECTION_NAME)
         except Exception:
             pass
-    collection = client.get_or_create_collection(COLLECTION_NAME)
+    collection = client.get_or_create_collection(COLLECTION_NAME, embedding_function=get_embedding_function())
 
     documents: list[str] = []
     metadatas: list[dict[str, str | int]] = []

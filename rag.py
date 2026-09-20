@@ -191,17 +191,26 @@ def answer(question: str, count: int = 5) -> dict:
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
                 temperature=0,
-                max_output_tokens=int(os.getenv("GEMINI_MAX_TOKENS", "300")),
+                max_output_tokens=int(os.getenv("GEMINI_MAX_TOKENS", "800")),
             ),
         )
-        response = (completion.text or "").strip()
+        try:
+            response = (completion.text or "").strip()
+        except (ValueError, AttributeError):
+            response = ""
     else:
         raise RuntimeError(
             f"Unsupported LLM_PROVIDER: {provider}. Use 'ollama', 'openai', or 'gemini'."
         )
 
     if not response:
-        raise RuntimeError("The configured AI model returned an empty response.")
+        return {
+            "answer": (
+                "I wasn't able to generate a complete answer for that question. "
+                "Please try rephrasing it or asking again."
+            ),
+            "sources": [],
+        }
 
     if response in (NOT_FOUND_MESSAGE, OFF_TOPIC_MESSAGE, ABUSE_REDIRECT_MESSAGE):
         return {"answer": response, "sources": []}
